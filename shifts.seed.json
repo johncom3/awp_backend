@@ -1,0 +1,62 @@
+{
+  "days": [
+    {
+      "date": "2026-11-07",
+      "timeBlocks": [
+        {
+          "time": "09:00–11:00",
+          "tasks": [
+            { "task": "Annahme", "places": 3 },
+            { "task": "Kontrolle", "places": 4 },
+            { "task": "Sortieren", "places": 3 }
+          ]
+        },
+        {
+          "time": "11:00–13:00",
+          "tasks": [
+            { "task": "Annahme", "places": 3 },
+            { "task": "Kontrolle", "places": 4 },
+            { "task": "Verladen", "places": 2 }
+          ]
+        },
+        {
+          "time": "13:00–15:00",
+          "tasks": [
+            { "task": "Kontrolle", "places": 4 },
+            { "task": "Sortieren", "places": 3 },
+            { "task": "Verladen", "places": 3 }
+          ]
+        }
+      ]
+    },
+    {
+      "date": "2026-11-14",
+      "timeBlocks": [
+        {
+          "time": "09:00–11:00",
+          "tasks": [
+            { "task": "Annahme", "places": 3 },
+            { "task": "Kontrolle", "places": 4 },
+            { "task": "Sortieren", "places": 3 }
+          ]
+        },
+        {
+          "time": "11:00–13:00",
+          "tasks": [
+            { "task": "Annahme", "places": 3 },
+            { "task": "Kontrolle", "places": 4 },
+            { "task": "Verladen", "places": 2 }
+          ]
+        },
+        {
+          "time": "13:00–15:00",
+          "tasks": [
+            { "task": "Kontrolle", "places": 4 },
+            { "task": "Sortieren", "places": 3 },
+            { "task": "Verladen", "places": 3 }
+          ]
+        }
+      ]
+    }
+  ]
+}
