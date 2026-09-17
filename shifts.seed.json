@@ -1,59 +1,93 @@
 {
   "days": [
     {
-      "date": "2026-11-07",
+      "date": "2026-10-31",
       "timeBlocks": [
         {
-          "time": "09:00–11:00",
+          "time": "07:00–09:00",
           "tasks": [
-            { "task": "Annahme", "places": 3 },
-            { "task": "Kontrolle", "places": 4 },
-            { "task": "Sortieren", "places": 3 }
+            { "task": "Aufbau", "places": 4 }
           ]
         },
         {
-          "time": "11:00–13:00",
+          "time": "09:00–12:00",
           "tasks": [
-            { "task": "Annahme", "places": 3 },
-            { "task": "Kontrolle", "places": 4 },
-            { "task": "Verladen", "places": 2 }
+            { "task": "Allrounder", "places": 1 },
+            { "task": "Einpacken", "places": 5 },
+            { "task": "Flyer", "places": 3 },
+            { "task": "Geschenkpapier einpacken", "places": 2 },
+            { "task": "Schnüren & Zählen", "places": 1 }
           ]
         },
         {
-          "time": "13:00–15:00",
+          "time": "12:00–15:00",
           "tasks": [
-            { "task": "Kontrolle", "places": 4 },
-            { "task": "Sortieren", "places": 3 },
-            { "task": "Verladen", "places": 3 }
+            { "task": "Allrounder", "places": 1 },
+            { "task": "Einpacken", "places": 6 },
+            { "task": "Flyer", "places": 2 },
+            { "task": "Geschenkpapier einpacken", "places": 2 },
+            { "task": "Schnüren & Zählen", "places": 1 }
+          ]
+        },
+        {
+          "time": "15:00–18:00",
+          "tasks": [
+            { "task": "Einpacken", "places": 2 },
+            { "task": "Flyer", "places": 1 },
+            { "task": "Geschenkpapier einpacken", "places": 2 },
+            { "task": "Schnüren & Zählen", "places": 1 }
+          ]
+        },
+        {
+          "time": "17:00–19:00",
+          "tasks": [
+            { "task": "Abbau", "places": 4 }
           ]
         }
       ]
     },
     {
-      "date": "2026-11-14",
+      "date": "2026-11-07",
       "timeBlocks": [
         {
-          "time": "09:00–11:00",
+          "time": "07:00–09:00",
           "tasks": [
-            { "task": "Annahme", "places": 3 },
-            { "task": "Kontrolle", "places": 4 },
-            { "task": "Sortieren", "places": 3 }
+            { "task": "Aufbau", "places": 3 }
           ]
         },
         {
-          "time": "11:00–13:00",
+          "time": "09:00–12:00",
           "tasks": [
-            { "task": "Annahme", "places": 3 },
-            { "task": "Kontrolle", "places": 4 },
-            { "task": "Verladen", "places": 2 }
+            { "task": "Allrounder", "places": 2 },
+            { "task": "Einpacken", "places": 7 },
+            { "task": "Flyer", "places": 2 },
+            { "task": "Geschenkpapier einpacken", "places": 2 },
+            { "task": "Schnüren & Zählen", "places": 1 }
           ]
         },
         {
-          "time": "13:00–15:00",
+          "time": "12:00–15:00",
           "tasks": [
-            { "task": "Kontrolle", "places": 4 },
-            { "task": "Sortieren", "places": 3 },
-            { "task": "Verladen", "places": 3 }
+            { "task": "Allrounder", "places": 1 },
+            { "task": "Einpacken", "places": 6 },
+            { "task": "Flyer", "places": 3 },
+            { "task": "Geschenkpapier einpacken", "places": 2 }
+          ]
+        },
+        {
+          "time": "15:00–18:00",
+          "tasks": [
+            { "task": "Allrounder", "places": 1 },
+            { "task": "Einpacken", "places": 5 },
+            { "task": "Flyer", "places": 3 },
+            { "task": "Geschenkpapier einpacken", "places": 2 },
+            { "task": "Schnüren & Zählen", "places": 1 }
+          ]
+        },
+        {
+          "time": "17:00–19:00",
+          "tasks": [
+            { "task": "Abbau", "places": 2 }
           ]
         }
       ]

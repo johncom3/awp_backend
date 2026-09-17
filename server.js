@@ -7,6 +7,7 @@ const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const ACCESS_PASSWORD = process.env.SHIFTPLAN_PASSWORD || process.env.AWP_PASSWORD || "weihnachtspaeckli";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || process.env.SHIFTPLAN_ADMIN_PASSWORD || ACCESS_PASSWORD;
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex");
 const TOKEN_TTL_SECONDS = Number(process.env.TOKEN_TTL_SECONDS || 60 * 60 * 24 * 30);
 
@@ -16,6 +17,10 @@ if (!process.env.SHIFTPLAN_PASSWORD && !process.env.AWP_PASSWORD) {
 
 if (!process.env.SESSION_SECRET) {
   console.warn("[config] SESSION_SECRET is not set. Tokens will be invalid after each restart.");
+}
+
+if (!process.env.ADMIN_PASSWORD && !process.env.SHIFTPLAN_ADMIN_PASSWORD) {
+  console.warn("[config] ADMIN_PASSWORD is not set. Admin login falls back to SHIFTPLAN_PASSWORD.");
 }
 
 function jsonHeaders(req) {
@@ -71,8 +76,9 @@ function sign(value) {
   return crypto.createHmac("sha256", SESSION_SECRET).update(value).digest("base64url");
 }
 
-function createToken() {
+function createToken(role = "user") {
   const payload = Buffer.from(JSON.stringify({
+    role,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS
   })).toString("base64url");
@@ -85,16 +91,25 @@ function verifyToken(token) {
   if (!timingSafeEqualText(signature, sign(payload))) return false;
   try {
     const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-    return data.exp && data.exp > Math.floor(Date.now() / 1000);
+    return data.exp && data.exp > Math.floor(Date.now() / 1000) ? data : false;
   } catch {
     return false;
   }
 }
 
-function isAuthorized(req) {
+function getAuthPayload(req) {
   const header = req.headers.authorization || "";
   const [, token] = header.match(/^Bearer\s+(.+)$/i) || [];
   return verifyToken(token);
+}
+
+function isAuthorized(req) {
+  return Boolean(getAuthPayload(req));
+}
+
+function isAdminAuthorized(req) {
+  const payload = getAuthPayload(req);
+  return Boolean(payload && payload.role === "admin");
 }
 
 async function loadSeedRows() {
@@ -113,6 +128,7 @@ async function loadSeedRows() {
             date: day.date,
             time: block.time,
             task: task.task,
+            position: i + 1,
             status: "open",
             name: null,
             phone_nr: null,
@@ -135,6 +151,9 @@ function createMemoryStore(seedRows) {
       return rows
         .filter((row) => (!from || row.date >= from) && (!to || row.date <= to))
         .sort((a, b) => `${a.date}|${a.time}|${a.task}|${a.id}`.localeCompare(`${b.date}|${b.time}|${b.task}|${b.id}`));
+    },
+    async adminList(from, to) {
+      return this.list(from, to);
     },
     async book(id, data) {
       const row = rows.find((item) => item.id === id);
@@ -162,8 +181,17 @@ function mapDbRow(row) {
   };
 }
 
+function makeShiftKey(date, time, task) {
+  return `${date}|${time}|${task}`;
+}
+
+function createSeedKeySet(seedRows) {
+  return new Set(seedRows.map((row) => makeShiftKey(row.date, row.time, row.task)));
+}
+
 async function createPostgresStore(seedRows) {
   const { Pool } = await import("pg");
+  const seedKeys = createSeedKeySet(seedRows);
   const dbUrl = new URL(DATABASE_URL);
   const sslMode = dbUrl.searchParams.get("sslmode");
   const useSsl = sslMode === "require" || sslMode === "verify-ca" || sslMode === "verify-full" || dbUrl.hostname.includes("railway");
@@ -192,16 +220,30 @@ async function createPostgresStore(seedRows) {
     )
   `);
 
-  const { rows: countRows } = await pool.query("select count(*)::int as count from shifts");
-  if (countRows[0]?.count === 0) {
-    for (const row of seedRows) {
+  let inserted = 0;
+  const groupedSeeds = new Map();
+  for (const row of seedRows) {
+    const key = `${row.date}|${row.time}|${row.task}`;
+    if (!groupedSeeds.has(key)) groupedSeeds.set(key, []);
+    groupedSeeds.get(key).push(row);
+  }
+
+  for (const [key, rowsForSlot] of groupedSeeds) {
+    const [date, time, task] = key.split("|");
+    const existing = await pool.query(
+      "select count(*)::int as count from shifts where shift_date = $1 and time_range = $2 and task = $3",
+      [date, time, task]
+    );
+    const missing = rowsForSlot.length - Number(existing.rows[0]?.count || 0);
+    for (let i = 0; i < missing; i += 1) {
       await pool.query(
         "insert into shifts (shift_date, time_range, task, status) values ($1, $2, $3, 'open')",
-        [row.date, row.time, row.task]
+        [date, time, task]
       );
+      inserted += 1;
     }
-    console.log(`[db] Seeded ${seedRows.length} shifts.`);
   }
+  if (inserted > 0) console.log(`[db] Seeded ${inserted} missing shifts.`);
 
   return {
     kind: "postgres",
@@ -222,9 +264,25 @@ async function createPostgresStore(seedRows) {
         ${where.length ? `where ${where.join(" and ")}` : ""}
         order by shift_date, time_range, task, id
       `, params);
-      return rows.map(mapDbRow);
+      return rows
+        .map(mapDbRow)
+        .filter((row) => seedKeys.has(makeShiftKey(row.date, row.time, row.task)));
+    },
+    async adminList(from, to) {
+      return this.list(from, to);
     },
     async book(id, data) {
+      const existing = await pool.query(`
+        select id, to_char(shift_date, 'YYYY-MM-DD') as date, time_range as time, task, status, name, phone_nr, organisation
+        from shifts
+        where id = $1
+      `, [id]);
+
+      const existingRow = existing.rows[0] ? mapDbRow(existing.rows[0]) : null;
+      if (!existingRow || !seedKeys.has(makeShiftKey(existingRow.date, existingRow.time, existingRow.task))) {
+        return { status: 404 };
+      }
+
       const { rows } = await pool.query(`
         update shifts
         set status = 'taken',
@@ -238,8 +296,7 @@ async function createPostgresStore(seedRows) {
 
       if (rows[0]) return { status: 200, row: mapDbRow(rows[0]) };
 
-      const exists = await pool.query("select id from shifts where id = $1", [id]);
-      return { status: exists.rows[0] ? 409 : 404 };
+      return { status: 409 };
     }
   };
 }
@@ -297,7 +354,7 @@ async function handleRequest(req, res) {
         configured: Boolean(DATABASE_URL),
         status: dbStatus
       },
-      endpoints: ["/health", "/auth/login", "/shifts", "/shifts/:id/book"]
+      endpoints: ["/health", "/auth/login", "/shifts", "/shifts/:id/book", "/admin/login", "/admin/shifts"]
     });
     return;
   }
@@ -309,6 +366,28 @@ async function handleRequest(req, res) {
       return;
     }
     sendJson(req, res, 401, { error: "invalid_password" });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/admin/login") {
+    const body = await parseBody(req);
+    if (timingSafeEqualText(body.password || "", ADMIN_PASSWORD)) {
+      sendJson(req, res, 200, { token: createToken("admin") });
+      return;
+    }
+    sendJson(req, res, 401, { error: "invalid_password" });
+    return;
+  }
+
+  if (url.pathname.startsWith("/admin") && !isAdminAuthorized(req)) {
+    sendJson(req, res, 401, { error: "unauthorized" });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/admin/shifts") {
+    const from = url.searchParams.get("from_date");
+    const to = url.searchParams.get("to_date");
+    sendJson(req, res, 200, await store.adminList(from, to));
     return;
   }
 
