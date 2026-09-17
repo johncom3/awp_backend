@@ -164,11 +164,16 @@ function mapDbRow(row) {
 
 async function createPostgresStore(seedRows) {
   const { Pool } = await import("pg");
+  const dbUrl = new URL(DATABASE_URL);
+  const sslMode = dbUrl.searchParams.get("sslmode");
+  const useSsl = sslMode === "require" || sslMode === "verify-ca" || sslMode === "verify-full" || dbUrl.hostname.includes("railway");
+
   const pool = new Pool({
     connectionString: DATABASE_URL,
-    ssl: DATABASE_URL.includes("railway.app") || DATABASE_URL.includes("proxy.rlwy.net")
-      ? { rejectUnauthorized: false }
-      : undefined
+    connectionTimeoutMillis: Number(process.env.PG_CONNECTION_TIMEOUT_MS || 5000),
+    idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT_MS || 30000),
+    max: Number(process.env.PG_POOL_MAX || 5),
+    ssl: useSsl ? { rejectUnauthorized: false } : undefined
   });
 
   await pool.query("select 1");
@@ -241,13 +246,22 @@ async function createPostgresStore(seedRows) {
 
 const seedRows = await loadSeedRows();
 let store = createMemoryStore(seedRows);
+let dbStatus = DATABASE_URL ? "initializing" : "not_configured";
+let dbError = null;
 
 if (DATABASE_URL) {
-  try {
-    store = await createPostgresStore(seedRows);
-  } catch (error) {
-    console.error("[db] Could not connect to Postgres. Falling back to in-memory store.", error);
-  }
+  createPostgresStore(seedRows)
+    .then((postgresStore) => {
+      store = postgresStore;
+      dbStatus = "connected";
+      dbError = null;
+      console.log("[db] Connected to Postgres.");
+    })
+    .catch((error) => {
+      dbStatus = "error";
+      dbError = error.message || String(error);
+      console.error("[db] Could not connect to Postgres. Falling back to in-memory store.", error);
+    });
 } else {
   console.warn("[db] DATABASE_URL is not set. Using in-memory store.");
 }
@@ -262,7 +276,15 @@ async function handleRequest(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
 
   if (req.method === "GET" && url.pathname === "/health") {
-    sendJson(req, res, 200, { ok: true, store: store.kind });
+    sendJson(req, res, 200, {
+      ok: true,
+      store: store.kind,
+      database: {
+        configured: Boolean(DATABASE_URL),
+        status: dbStatus,
+        error: dbError
+      }
+    });
     return;
   }
 
@@ -271,6 +293,10 @@ async function handleRequest(req, res) {
       name: "Aktion Weihnachtspäckli Shiftplan API",
       ok: true,
       store: store.kind,
+      database: {
+        configured: Boolean(DATABASE_URL),
+        status: dbStatus
+      },
       endpoints: ["/health", "/auth/login", "/shifts", "/shifts/:id/book"]
     });
     return;
